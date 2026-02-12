@@ -16,7 +16,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { text, completed } = body;
+    const { text, completed, image_url } = body;
 
     // 验证 todo 是否属于当前用户
     const { data: todoData, error: checkError } = await supabase
@@ -33,6 +33,7 @@ export async function PATCH(
     const updateData: { [key: string]: any } = {};
     if (text !== undefined) updateData.text = text;
     if (completed !== undefined) updateData.completed = completed;
+    if (image_url !== undefined) updateData.image_url = image_url;
 
     const { data, error } = await supabase
       .from("todos")

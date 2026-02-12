@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Circle, Plus, Trash2, Pencil, X, LogIn, Loader2 } from "lucide-react";
+import { Check, Circle, Plus, Trash2, Pencil, X, LogIn, Loader2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -11,6 +11,7 @@ type Todo = {
   text: string;
   completed: boolean;
   created_at: string;
+  image_url?: string;
 };
 
 export function TodoList() {
@@ -22,6 +23,9 @@ export function TodoList() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
 
   const supabase = createClient();
 
@@ -92,12 +96,37 @@ export function TodoList() {
       setInputError("");
 
       try {
+        // 如果有选择图片，先上传图片
+        let imageUrl: string | undefined;
+        if (selectedFile) {
+          setIsUploading(true);
+          const formData = new FormData();
+          formData.append("file", selectedFile);
+
+          const uploadResponse = await fetch("/api/upload-image", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!uploadResponse.ok) {
+            const error = await uploadResponse.json();
+            setInputError(error.error || "图片上传失败");
+            setIsUploading(false);
+            setIsSaving(false);
+            return;
+          }
+
+          const uploadData = await uploadResponse.json();
+          imageUrl = uploadData.imageUrl;
+          setIsUploading(false);
+        }
+
         const response = await fetch("/api/todos", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ text: newTodo.trim() }),
+          body: JSON.stringify({ text: newTodo.trim(), image_url: imageUrl }),
         });
 
         if (!response.ok) {
@@ -109,11 +138,13 @@ export function TodoList() {
         const data = await response.json();
         setTodos([data.todo, ...todos]);
         setNewTodo("");
+        clearImage();
       } catch (error) {
         console.error("添加错误:", error);
         setInputError("添加失败，请重试");
       } finally {
         setIsSaving(false);
+        setIsUploading(false);
       }
     } else {
       setInputError("请输入待办事项内容");
@@ -219,6 +250,39 @@ export function TodoList() {
     setInputError("");
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 验证文件类型
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setInputError("只支持 JPG、PNG、GIF、WebP 格式的图片");
+      return;
+    }
+
+    // 验证文件大小（5MB）
+    if (file.size > 5 * 1024 * 1024) {
+      setInputError("图片大小不能超过 5MB");
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // 创建预览
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    setInputError("");
+  };
+
+  const clearImage = () => {
+    setSelectedFile(null);
+    setImagePreview("");
+  };
+
   if (isLoading) {
     return (
       <div className="py-12 px-4 sm:px-6 lg:px-8">
@@ -253,7 +317,7 @@ export function TodoList() {
           )}
 
           <form onSubmit={addTodo} className="mb-6">
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-2">
               <input
                 type="text"
                 value={newTodo}
@@ -267,18 +331,48 @@ export function TodoList() {
                   inputError ? "border-red-400" : "border-white/30"
                 } ${!isAuthenticated ? "opacity-50 cursor-not-allowed" : ""}`}
               />
+              <label className={`p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white cursor-pointer ${!isAuthenticated ? "opacity-50 cursor-not-allowed" : ""}`}>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={handleFileSelect}
+                  disabled={!isAuthenticated || isSaving}
+                  className="hidden"
+                />
+                <ImageIcon className="w-6 h-6" />
+              </label>
               <button
                 type="submit"
-                disabled={!isAuthenticated || isSaving}
+                disabled={!isAuthenticated || isSaving || isUploading}
                 className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSaving ? (
+                {isSaving || isUploading ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
                 ) : (
                   <Plus className="w-6 h-6" />
                 )}
               </button>
             </div>
+
+            {/* 图片预览 */}
+            {imagePreview && (
+              <div className="relative mb-2">
+                <img
+                  src={imagePreview}
+                  alt="预览"
+                  className="w-full h-32 object-cover rounded-lg border border-white/30"
+                />
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  disabled={isSaving}
+                  className="absolute top-2 right-2 p-1 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             {inputError && (
               <p className="text-red-200 text-sm mt-1">{inputError}</p>
             )}
@@ -289,7 +383,7 @@ export function TodoList() {
               <div
                 key={todo.id}
                 className={cn(
-                  "group flex items-center gap-3 p-3 rounded-lg transition-all duration-300",
+                  "group flex items-start gap-3 p-3 rounded-lg transition-all duration-300",
                   "bg-white/10 hover:bg-white/20",
                   todo.completed && "opacity-75"
                 )}
@@ -297,7 +391,7 @@ export function TodoList() {
                 <button
                   onClick={() => toggleTodo(todo.id)}
                   disabled={!isAuthenticated || isSaving}
-                  className="text-white hover:scale-110 transition-transform duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="text-white hover:scale-110 transition-transform duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mt-1"
                 >
                   {todo.completed ? (
                     <Check className="w-6 h-6" />
@@ -306,47 +400,58 @@ export function TodoList() {
                   )}
                 </button>
 
-                {editingId === todo.id ? (
-                  <div className="flex-1 flex gap-2">
-                    <input
-                      type="text"
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      className="flex-1 px-3 py-1 rounded bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit();
-                        if (e.key === "Escape") cancelEdit();
-                      }}
-                    />
-                    <button
-                      onClick={saveEdit}
-                      disabled={isSaving}
-                      className="p-1 text-white hover:text-green-300 transition-colors disabled:opacity-50"
-                    >
-                      {isSaving ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Check className="w-5 h-5" />
+                <div className="flex-1 min-w-0">
+                  {editingId === todo.id ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="flex-1 px-3 py-1 rounded bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit();
+                          if (e.key === "Escape") cancelEdit();
+                        }}
+                      />
+                      <button
+                        onClick={saveEdit}
+                        disabled={isSaving}
+                        className="p-1 text-white hover:text-green-300 transition-colors disabled:opacity-50"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Check className="w-5 h-5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="p-1 text-white hover:text-red-300 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span
+                        className={cn(
+                          "text-white transition-all duration-300",
+                          todo.completed && "line-through opacity-75"
+                        )}
+                      >
+                        {todo.text}
+                      </span>
+                      {todo.image_url && (
+                        <img
+                          src={todo.image_url}
+                          alt="任务图片"
+                          className="mt-2 rounded-lg max-h-48 w-auto object-cover border border-white/20"
+                        />
                       )}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="p-1 text-white hover:text-red-300 transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                ) : (
-                  <span
-                    className={cn(
-                      "flex-1 text-white transition-all duration-300",
-                      todo.completed && "line-through opacity-75"
-                    )}
-                  >
-                    {todo.text}
-                  </span>
-                )}
+                    </>
+                  )}
+                </div>
 
                 {editingId !== todo.id && (
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
