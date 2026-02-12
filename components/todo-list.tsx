@@ -25,7 +25,6 @@ export function TodoList() {
 
   const supabase = createClient();
 
-  // 加载当前用户的 todos
   const loadTodos = async () => {
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -65,24 +64,20 @@ export function TodoList() {
   useEffect(() => {
     loadTodos();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setIsAuthenticated(!!session?.user);
-        if (session?.user) {
-          loadTodos();
-        } else {
-          setTodos([]);
-        }
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session?.user);
+      if (session?.user) {
+        loadTodos();
+      } else {
+        setTodos([]);
       }
-    }
-    );
+    });
 
     return () => {
-      subscription.unsubscribe();
+      data.subscription.unsubscribe();
     };
   }, []);
 
-  // 添加新的 todo
   const addTodo = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -126,11 +121,10 @@ export function TodoList() {
     }
   };
 
-  // 切换完成状态
   const toggleTodo = async (id: string) => {
     if (!isAuthenticated) return;
 
-    const todo = todos.find(t => t.id === id);
+    const todo = todos.find((t) => t.id === id);
     if (!todo) return;
 
     try {
@@ -148,16 +142,15 @@ export function TodoList() {
         return;
       }
 
-      setTodos(todos.map(t =>
-        t.id === id ? { ...t, completed: !t.completed } : t
-      ));
+      setTodos(
+        todos.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+      );
     } catch (error) {
       console.error("更新错误:", error);
       setInputError("更新失败，请重试");
     }
   };
 
-  // 删除 todo
   const deleteTodo = async (id: string) => {
     if (!isAuthenticated) return;
 
@@ -172,14 +165,13 @@ export function TodoList() {
         return;
       }
 
-      setTodos(todos.filter(t => t.id !== id));
+      setTodos(todos.filter((t) => t.id !== id));
     } catch (error) {
       console.error("删除错误:", error);
       setInputError("删除失败，请重试");
     }
   };
 
-  // 开始编辑
   const startEditing = (todo: Todo) => {
     if (!isAuthenticated) return;
     setEditingId(todo.id);
@@ -187,7 +179,6 @@ export function TodoList() {
     setInputError("");
   };
 
-  // 保存编辑
   const saveEdit = async () => {
     if (!isAuthenticated) return;
     if (editText.trim() && editingId) {
@@ -208,9 +199,9 @@ export function TodoList() {
           return;
         }
 
-        setTodos(todos.map(t =>
-          t.id === editingId ? { ...t, text: editText.trim() } : t
-        ));
+        setTodos(
+          todos.map((t) => (t.id === editingId ? { ...t, text: editText.trim() } : t))
+        );
         setEditingId(null);
         setEditText("");
       } catch (error) {
@@ -273,8 +264,8 @@ export function TodoList() {
                 placeholder="添加新任务..."
                 disabled={!isAuthenticated || isSaving}
                 className={`flex-1 px-4 py-2 rounded-lg bg-white/20 border text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 ${
-                  inputError ? 'border-red-400' : 'border-white/30'
-                } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  inputError ? "border-red-400" : "border-white/30"
+                } ${!isAuthenticated ? "opacity-50 cursor-not-allowed" : ""}`}
               />
               <button
                 type="submit"
@@ -324,8 +315,8 @@ export function TodoList() {
                       className="flex-1 px-3 py-1 rounded bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
                       autoFocus
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveEdit();
-                        if (e.key === 'Escape') cancelEdit();
+                        if (e.key === "Enter") saveEdit();
+                        if (e.key === "Escape") cancelEdit();
                       }}
                     />
                     <button
