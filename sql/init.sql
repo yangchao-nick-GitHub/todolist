@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.todos (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   text TEXT NOT NULL,
+  image_url TEXT,  -- 添加图片URL字段
   completed BOOLEAN DEFAULT FALSE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
@@ -77,6 +78,7 @@ USING (auth.uid() = user_id);
 -- id: UUID，主键，自动生成的唯一标识符
 -- user_id: UUID，外键关联到 auth.users 表，用于 RLS 策略
 -- text: TEXT，待办事项的内容
+-- image_url: TEXT，图片的 URL（可选）
 -- completed: BOOLEAN，是否完成，默认为 false
 -- created_at: TIMESTAMPTZ，创建时间，自动设置为当前 UTC 时间
 -- updated_at: TIMESTAMPTZ，最后更新时间，自动设置为当前 UTC 时间
