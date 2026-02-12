@@ -47,8 +47,11 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
+  // 首页不需要登录检查，允许游客访问
+  // 只有受保护页面才需要登录
   if (
     !user &&
+    request.nextUrl.pathname.startsWith("/protected") &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Circle, Plus, Trash2, Pencil, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, Circle, Plus, Trash2, Pencil, X, LogIn } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 type Todo = {
   id: number;
@@ -16,9 +18,39 @@ export function TodoList() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [inputError, setInputError] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      setIsAuthenticated(!!data.user);
+      setIsLoading(false);
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          setIsAuthenticated(!!session?.user);
+        }
+      );
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    };
+
+    checkAuth();
+  }, []);
 
   const addTodo = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!isAuthenticated) {
+      setInputError("请先登录");
+      setTimeout(() => setInputError(""), 2000);
+      return;
+    }
+
     if (newTodo.trim()) {
       setTodos([...todos, { id: Date.now(), text: newTodo.trim(), completed: false }]);
       setNewTodo("");
@@ -30,21 +62,25 @@ export function TodoList() {
   };
 
   const toggleTodo = (id: number) => {
+    if (!isAuthenticated) return;
     setTodos(todos.map(todo =>
       todo.id === id ? { ...todo, completed: !todo.completed } : todo
     ));
   };
 
   const deleteTodo = (id: number) => {
+    if (!isAuthenticated) return;
     setTodos(todos.filter(todo => todo.id !== id));
   };
 
   const startEditing = (todo: Todo) => {
+    if (!isAuthenticated) return;
     setEditingId(todo.id);
     setEditText(todo.text);
   };
 
   const saveEdit = () => {
+    if (!isAuthenticated) return;
     if (editText.trim() && editingId) {
       setTodos(todos.map(todo =>
         todo.id === editingId ? { ...todo, text: editText.trim() } : todo
@@ -59,6 +95,18 @@ export function TodoList() {
     setEditText("");
   };
 
+  if (isLoading) {
+    return (
+      <div className="py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl p-6">
+            <div className="text-center text-white">加载中...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto">
@@ -66,6 +114,19 @@ export function TodoList() {
           <h1 className="text-3xl font-bold text-white mb-8 text-center">
             待办事项
           </h1>
+
+          {!isAuthenticated && (
+            <div className="mb-6 p-4 rounded-lg bg-white/10 border border-white/20 text-center">
+              <p className="text-white mb-3">请先登录以使用待办事项功能</p>
+              <Link
+                href="/auth/login"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors text-white font-medium"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>前往登录</span>
+              </Link>
+            </div>
+          )}
 
           <form onSubmit={addTodo} className="mb-6">
             <div className="flex gap-2">
@@ -77,13 +138,15 @@ export function TodoList() {
                   setInputError("");
                 }}
                 placeholder="添加新任务..."
+                disabled={!isAuthenticated}
                 className={`flex-1 px-4 py-2 rounded-lg bg-white/20 border text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 ${
                   inputError ? 'border-red-400' : 'border-white/30'
-                }`}
+                } ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
               />
               <button
                 type="submit"
-                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white"
+                disabled={!isAuthenticated}
+                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-6 h-6" />
               </button>
@@ -105,7 +168,8 @@ export function TodoList() {
               >
                 <button
                   onClick={() => toggleTodo(todo.id)}
-                  className="text-white hover:scale-110 transition-transform duration-200"
+                  disabled={!isAuthenticated}
+                  className="text-white hover:scale-110 transition-transform duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   {todo.completed ? (
                     <Check className="w-6 h-6" />
@@ -155,13 +219,15 @@ export function TodoList() {
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <button
                       onClick={() => startEditing(todo)}
-                      className="p-1 text-white hover:text-blue-300 transition-colors"
+                      disabled={!isAuthenticated}
+                      className="p-1 text-white hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Pencil className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => deleteTodo(todo.id)}
-                      className="p-1 text-white hover:text-red-300 transition-colors"
+                      disabled={!isAuthenticated}
+                      className="p-1 text-white hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -171,9 +237,15 @@ export function TodoList() {
             ))}
           </div>
 
-          {todos.length === 0 && (
+          {todos.length === 0 && isAuthenticated && (
             <div className="text-center text-white/70 mt-8">
               还没有待办事项，添加一个开始吧！
+            </div>
+          )}
+
+          {!isAuthenticated && todos.length === 0 && (
+            <div className="text-center text-white/70 mt-8">
+              登录后即可创建和管理您的待办事项
             </div>
           )}
         </div>
