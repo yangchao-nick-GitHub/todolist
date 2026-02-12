@@ -26,6 +26,8 @@ export function TodoList() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
+  // 用于追踪本地最近操作的 todo ID，避免 Realtime 重复更新
+  const [recentLocalChanges, setRecentLocalChanges] = useState<Set<string>>(new Set());
 
   const supabase = createClient();
 
@@ -68,7 +70,7 @@ export function TodoList() {
   useEffect(() => {
     loadTodos();
 
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: authData } = supabase.auth.onAuthStateChange((event, session) => {
       setIsAuthenticated(!!session?.user);
       if (session?.user) {
         loadTodos();
@@ -77,8 +79,85 @@ export function TodoList() {
       }
     });
 
+    // 创建 Realtime 频道订阅 todos 表的变更
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      channel = supabase
+        .channel(`todos:${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'todos',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('Realtime 更新:', payload);
+            const { eventType, new: newRecord, old: oldRecord } = payload;
+
+            // 检查是否是本地操作导致的重复更新
+            const recordId = eventType === 'DELETE' ? oldRecord?.id : newRecord?.id;
+            if (!recordId) return;
+
+            if (recentLocalChanges.has(recordId)) {
+              console.log('忽略本地操作的重复更新:', recordId);
+              // 清理过期的变更记录（5秒后）
+              setTimeout(() => {
+                setRecentLocalChanges((prev) => {
+                  const next = new Set(prev);
+                  next.delete(recordId);
+                  return next;
+                });
+              }, 5000);
+              return;
+            }
+
+            switch (eventType) {
+              case 'INSERT':
+                // 新增待办事项（来自其他设备）
+                setTodos((prev) => {
+                  // 避免重复添加
+                  if (prev.some((t) => t.id === newRecord.id)) {
+                    return prev;
+                  }
+                  return [newRecord as Todo, ...prev];
+                });
+                break;
+              case 'UPDATE':
+                // 更新待办事项（来自其他设备）
+                setTodos((prev) =>
+                  prev.map((todo) =>
+                    todo.id === newRecord.id ? (newRecord as Todo) : todo
+                  )
+                );
+                break;
+              case 'DELETE':
+                // 删除待办事项（来自其他设备）
+                setTodos((prev) =>
+                  prev.filter((todo) => todo.id !== oldRecord.id)
+                );
+                break;
+            }
+          }
+        )
+        .subscribe();
+
+      console.log('Realtime 订阅已建立');
+    };
+
+    setupRealtimeSubscription();
+
     return () => {
-      data.subscription.unsubscribe();
+      authData.subscription.unsubscribe();
+      if (channel) {
+        supabase.removeChannel(channel);
+        console.log('Realtime 订阅已取消');
+      }
     };
   }, []);
 
@@ -139,6 +218,8 @@ export function TodoList() {
         setTodos([data.todo, ...todos]);
         setNewTodo("");
         clearImage();
+        // 记录本次操作，避免 Realtime 重复处理
+        setRecentLocalChanges((prev) => new Set(prev).add(data.todo.id));
       } catch (error) {
         console.error("添加错误:", error);
         setInputError("添加失败，请重试");
@@ -176,6 +257,8 @@ export function TodoList() {
       setTodos(
         todos.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
       );
+      // 记录本次操作，避免 Realtime 重复处理
+      setRecentLocalChanges((prev) => new Set(prev).add(id));
     } catch (error) {
       console.error("更新错误:", error);
       setInputError("更新失败，请重试");
@@ -197,6 +280,8 @@ export function TodoList() {
       }
 
       setTodos(todos.filter((t) => t.id !== id));
+      // 记录本次操作，避免 Realtime 重复处理
+      setRecentLocalChanges((prev) => new Set(prev).add(id));
     } catch (error) {
       console.error("删除错误:", error);
       setInputError("删除失败，请重试");
@@ -235,6 +320,8 @@ export function TodoList() {
         );
         setEditingId(null);
         setEditText("");
+        // 记录本次操作，避免 Realtime 重复处理
+        setRecentLocalChanges((prev) => new Set(prev).add(editingId));
       } catch (error) {
         console.error("保存错误:", error);
         setInputError("保存失败，请重试");
