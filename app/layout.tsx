@@ -1,7 +1,8 @@
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Link from "next/link";
-import { Home, LogIn, UserPlus } from "lucide-react";
+import { Home } from "lucide-react";
+import { AuthHeader } from "@/components/auth-header";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -43,22 +44,7 @@ export default function RootLayout({
                   <Home className="w-5 h-5" />
                   <span>首页</span>
                 </Link>
-                <div className="flex gap-2">
-                  <Link
-                    href="/auth/login"
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-medium"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    <span>登录</span>
-                  </Link>
-                  <Link
-                    href="/auth/sign-up"
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-medium"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>注册</span>
-                  </Link>
-                </div>
+                <AuthHeader />
               </div>
             </header>
             <main>{children}</main>
