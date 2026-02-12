@@ -1,20 +1,20 @@
-import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import Link from "next/link";
+import { Home, LogIn, UserPlus } from "lucide-react";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
   : "http://localhost:3000";
 
-export const metadata: Metadata = {
+export const metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Next.js and Supabase Starter Kit",
   description: "The fastest way to build apps with Next.js and Supabase",
 };
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
   display: "swap",
   subsets: ["latin"],
 });
@@ -25,15 +25,44 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+    <html lang="en" className={geistSans.className} suppressHydrationWarning>
+      <body className="bg-background text-foreground">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
+            <header className="sticky top-0 z-50 w-full backdrop-blur-lg bg-white/10 border-b border-white/20">
+              <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 text-white font-semibold hover:text-white/80 transition-colors"
+                >
+                  <Home className="w-5 h-5" />
+                  <span>首页</span>
+                </Link>
+                <div className="flex gap-2">
+                  <Link
+                    href="/auth/login"
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-medium"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>登录</span>
+                  </Link>
+                  <Link
+                    href="/auth/sign-up"
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-medium"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>注册</span>
+                  </Link>
+                </div>
+              </div>
+            </header>
+            <main>{children}</main>
+          </div>
         </ThemeProvider>
       </body>
     </html>
