@@ -15,12 +15,17 @@ export default function Home() {
   const [newTodo, setNewTodo] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
+  const [inputError, setInputError] = useState("");
 
-  const addTodo = (e: React.FormEvent) => {
+  const addTodo = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (newTodo.trim()) {
       setTodos([...todos, { id: Date.now(), text: newTodo.trim(), completed: false }]);
       setNewTodo("");
+      setInputError("");
+    } else {
+      setInputError("请输入待办事项内容");
+      setTimeout(() => setInputError(""), 2000);
     }
   };
 
@@ -59,7 +64,7 @@ export default function Home() {
       <div className="max-w-md mx-auto">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl p-6">
           <h1 className="text-3xl font-bold text-white mb-8 text-center">
-            Todo List
+            待办事项
           </h1>
 
           <form onSubmit={addTodo} className="mb-6">
@@ -67,9 +72,14 @@ export default function Home() {
               <input
                 type="text"
                 value={newTodo}
-                onChange={(e) => setNewTodo(e.target.value)}
-                placeholder="Add a new task..."
-                className="flex-1 px-4 py-2 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+                onChange={(e) => {
+                  setNewTodo(e.target.value);
+                  setInputError("");
+                }}
+                placeholder="添加新任务..."
+                className={`flex-1 px-4 py-2 rounded-lg bg-white/20 border text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 ${
+                  inputError ? 'border-red-400' : 'border-white/30'
+                }`}
               />
               <button
                 type="submit"
@@ -78,6 +88,9 @@ export default function Home() {
                 <Plus className="w-6 h-6" />
               </button>
             </div>
+            {inputError && (
+              <p className="text-red-200 text-sm mt-1">{inputError}</p>
+            )}
           </form>
 
           <div className="space-y-3">
@@ -160,7 +173,7 @@ export default function Home() {
 
           {todos.length === 0 && (
             <div className="text-center text-white/70 mt-8">
-              No todos yet. Add one to get started!
+              还没有待办事项，添加一个开始吧！
             </div>
           )}
         </div>
