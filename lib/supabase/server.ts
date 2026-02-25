@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Especially important if using Fluid compute: Don't put this client in a
@@ -30,5 +31,22 @@ export async function createClient() {
         },
       },
     },
+  );
+}
+
+/**
+ * 创建使用 Service Role Key 的 Supabase 客户端
+ * 用于绕过 RLS 策略，执行管理操作
+ */
+export function createServiceRoleClient(serviceRoleKey: string) {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
   );
 }

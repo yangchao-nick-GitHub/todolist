@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Circle, Plus, Trash2, Pencil, X, LogIn, Loader2, Image as ImageIcon } from "lucide-react";
+import { Check, Circle, Plus, Trash2, Pencil, X, LogIn, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -23,9 +23,6 @@ export function TodoList() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>("");
-  const [isUploading, setIsUploading] = useState(false);
   // 用于追踪本地最近操作的 todo ID，避免 Realtime 重复更新
   const [recentLocalChanges, setRecentLocalChanges] = useState<Set<string>>(new Set());
 
@@ -175,57 +172,34 @@ export function TodoList() {
       setInputError("");
 
       try {
-        // 如果有选择图片，先上传图片
-        let imageUrl: string | undefined;
-        if (selectedFile) {
-          setIsUploading(true);
-          const formData = new FormData();
-          formData.append("file", selectedFile);
-
-          const uploadResponse = await fetch("/api/upload-image", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!uploadResponse.ok) {
-            const error = await uploadResponse.json();
-            setInputError(error.error || "图片上传失败");
-            setIsUploading(false);
-            setIsSaving(false);
-            return;
-          }
-
-          const uploadData = await uploadResponse.json();
-          imageUrl = uploadData.imageUrl;
-          setIsUploading(false);
-        }
-
-        const response = await fetch("/api/todos", {
+        const response = await fetch("/api/ai-parse-todos", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ text: newTodo.trim(), image_url: imageUrl }),
+          body: JSON.stringify({ text: newTodo.trim() }),
         });
 
         if (!response.ok) {
           const error = await response.json();
-          setInputError(error.error || "添加失败");
+          setInputError(error.error || "AI 解析失败");
           return;
         }
 
         const data = await response.json();
-        setTodos([data.todo, ...todos]);
+        // 将新创建的待办事项添加到列表前面
+        setTodos([...data.todos, ...todos]);
         setNewTodo("");
-        clearImage();
-        // 记录本次操作，避免 Realtime 重复处理
-        setRecentLocalChanges((prev) => new Set(prev).add(data.todo.id));
+
+        // 记录所有新操作，避免 Realtime 重复处理
+        const newIds = new Set(recentLocalChanges);
+        data.todos.forEach((todo: Todo) => newIds.add(todo.id));
+        setRecentLocalChanges(newIds);
       } catch (error) {
-        console.error("添加错误:", error);
-        setInputError("添加失败，请重试");
+        console.error("AI 解析错误:", error);
+        setInputError("AI 解析失败，请重试");
       } finally {
         setIsSaving(false);
-        setIsUploading(false);
       }
     } else {
       setInputError("请输入待办事项内容");
@@ -337,39 +311,6 @@ export function TodoList() {
     setInputError("");
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // 验证文件类型
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      setInputError("只支持 JPG、PNG、GIF、WebP 格式的图片");
-      return;
-    }
-
-    // 验证文件大小（5MB）
-    if (file.size > 5 * 1024 * 1024) {
-      setInputError("图片大小不能超过 5MB");
-      return;
-    }
-
-    setSelectedFile(file);
-
-    // 创建预览
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-    setInputError("");
-  };
-
-  const clearImage = () => {
-    setSelectedFile(null);
-    setImagePreview("");
-  };
-
   if (isLoading) {
     return (
       <div className="py-12 px-4 sm:px-6 lg:px-8">
@@ -404,65 +345,45 @@ export function TodoList() {
           )}
 
           <form onSubmit={addTodo} className="mb-6">
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={newTodo}
-                onChange={(e) => {
-                  setNewTodo(e.target.value);
-                  setInputError("");
-                }}
-                placeholder="添加新任务..."
-                disabled={!isAuthenticated || isSaving}
-                className={`flex-1 px-4 py-2 rounded-lg bg-white/20 border text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 ${
-                  inputError ? "border-red-400" : "border-white/30"
-                } ${!isAuthenticated ? "opacity-50 cursor-not-allowed" : ""}`}
-              />
-              <label className={`p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white cursor-pointer ${!isAuthenticated ? "opacity-50 cursor-not-allowed" : ""}`}>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  onChange={handleFileSelect}
-                  disabled={!isAuthenticated || isSaving}
-                  className="hidden"
-                />
-                <ImageIcon className="w-6 h-6" />
-              </label>
-              <button
-                type="submit"
-                disabled={!isAuthenticated || isSaving || isUploading}
-                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSaving || isUploading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <Plus className="w-6 h-6" />
-                )}
-              </button>
-            </div>
+            <textarea
+              value={newTodo}
+              onChange={(e) => {
+                setNewTodo(e.target.value);
+                setInputError("");
+              }}
+              placeholder="输入待办事项，AI 会自动解析...&#10;例如：&#10;- 明天下午3点开会&#10;- 买牛奶和面包&#10;- 完成项目报告"
+              disabled={!isAuthenticated || isSaving}
+              rows={3}
+              className={`w-full px-4 py-3 rounded-lg bg-white/20 border text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none ${
+                inputError ? "border-red-400" : "border-white/30"
+              } ${!isAuthenticated ? "opacity-50 cursor-not-allowed" : ""}`}
+            />
 
-            {/* 图片预览 */}
-            {imagePreview && (
-              <div className="relative mb-2">
-                <img
-                  src={imagePreview}
-                  alt="预览"
-                  className="w-full h-32 object-cover rounded-lg border border-white/30"
-                />
+            <div className="mt-3 space-y-3">
+              {inputError && (
+                <p className="text-red-200 text-sm text-center">{inputError}</p>
+              )}
+
+              <div className="flex justify-center">
                 <button
-                  type="button"
-                  onClick={clearImage}
-                  disabled={isSaving}
-                  className="absolute top-2 right-2 p-1 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+                  type="submit"
+                  disabled={!isAuthenticated || isSaving}
+                  className="flex items-center gap-2 px-6 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <X className="w-4 h-4" />
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>AI 解析中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-5 h-5" />
+                      <span>AI 解析并添加</span>
+                    </>
+                  )}
                 </button>
               </div>
-            )}
-
-            {inputError && (
-              <p className="text-red-200 text-sm mt-1">{inputError}</p>
-            )}
+            </div>
           </form>
 
           <div className="space-y-3">
