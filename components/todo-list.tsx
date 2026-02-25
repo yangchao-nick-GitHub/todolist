@@ -398,25 +398,23 @@ export function TodoList() {
                 <p className="text-red-200 text-sm text-center">{inputError}</p>
               )}
 
-              <div className="flex justify-center">
-                <button
-                  type="submit"
-                  disabled={!isAuthenticated || isSaving}
-                  className="flex items-center gap-2 px-6 py-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>AI 解析中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-5 h-5" />
-                      <span>AI 解析并添加</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={!isAuthenticated || isSaving}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>AI 解析中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    <span>AI 解析并添加</span>
+                  </>
+                )}
+              </button>
             </div>
           </form>
 
