@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "TURBOPACK=0 next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."
