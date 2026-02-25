@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Circle, Plus, Trash2, Pencil, X, LogIn, Loader2 } from "lucide-react";
+import { Check, Circle, Plus, Trash2, Pencil, X, LogIn, Loader2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -23,6 +23,9 @@ export function TodoList() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
   // 用于追踪本地最近操作的 todo ID，避免 Realtime 重复更新
   const [recentLocalChanges, setRecentLocalChanges] = useState<Set<string>>(new Set());
 
@@ -167,43 +170,75 @@ export function TodoList() {
       return;
     }
 
-    if (newTodo.trim()) {
-      setIsSaving(true);
-      setInputError("");
+    // 至少需要图片或文字
+    if (!newTodo.trim() && !selectedFile) {
+      setInputError("请输入文字或上传图片");
+      setTimeout(() => setInputError(""), 2000);
+      return;
+    }
 
-      try {
-        const response = await fetch("/api/ai-parse-todos", {
+    setIsSaving(true);
+    setInputError("");
+
+    try {
+      // 如果有选择图片，先上传图片
+      let imageUrl: string | undefined;
+      if (selectedFile) {
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+
+        const uploadResponse = await fetch("/api/upload-image", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ text: newTodo.trim() }),
+          body: formData,
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          setInputError(error.error || "AI 解析失败");
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          setInputError(error.error || "图片上传失败");
+          setIsUploading(false);
+          setIsSaving(false);
           return;
         }
 
-        const data = await response.json();
-        // 将新创建的待办事项添加到列表前面
-        setTodos([...data.todos, ...todos]);
-        setNewTodo("");
-
-        // 记录所有新操作，避免 Realtime 重复处理
-        const newIds = new Set(recentLocalChanges);
-        data.todos.forEach((todo: Todo) => newIds.add(todo.id));
-        setRecentLocalChanges(newIds);
-      } catch (error) {
-        console.error("AI 解析错误:", error);
-        setInputError("AI 解析失败，请重试");
-      } finally {
-        setIsSaving(false);
+        const uploadData = await uploadResponse.json();
+        imageUrl = uploadData.imageUrl;
+        setIsUploading(false);
       }
-    } else {
-      setInputError("请输入待办事项内容");
-      setTimeout(() => setInputError(""), 2000);
+
+      const response = await fetch("/api/ai-parse-todos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: newTodo.trim() || undefined,
+          imageUrl: imageUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        setInputError(error.error || "AI 解析失败");
+        return;
+      }
+
+      const data = await response.json();
+      // 将新创建的待办事项添加到列表前面
+      setTodos([...data.todos, ...todos]);
+      setNewTodo("");
+      clearImage();
+
+      // 记录所有新操作，避免 Realtime 重复处理
+      const newIds = new Set(recentLocalChanges);
+      data.todos.forEach((todo: Todo) => newIds.add(todo.id));
+      setRecentLocalChanges(newIds);
+    } catch (error) {
+      console.error("AI 解析错误:", error);
+      setInputError("AI 解析失败，请重试");
+    } finally {
+      setIsSaving(false);
+      setIsUploading(false);
     }
   };
 
@@ -345,6 +380,39 @@ export function TodoList() {
     setInputError("");
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 验证文件类型
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setInputError("只支持 JPG、PNG、GIF、WebP 格式的图片");
+      return;
+    }
+
+    // 验证文件大小（5MB）
+    if (file.size > 5 * 1024 * 1024) {
+      setInputError("图片大小不能超过 5MB");
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // 创建预览
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    setInputError("");
+  };
+
+  const clearImage = () => {
+    setSelectedFile(null);
+    setImagePreview("");
+  };
+
   if (isLoading) {
     return (
       <div className="py-12 px-4 sm:px-6 lg:px-8">
@@ -385,13 +453,50 @@ export function TodoList() {
                 setNewTodo(e.target.value);
                 setInputError("");
               }}
-              placeholder="输入待办事项，AI 会自动解析...&#10;例如：&#10;- 明天下午3点开会&#10;- 买牛奶和面包&#10;- 完成项目报告"
+              placeholder="输入待办事项或上传图片，AI 会自动解析...&#10;例如：&#10;- 明天下午3点开会&#10;- 买牛奶和面包&#10;- 完成项目报告&#10;&#10;提示：可以直接上传待办事项的截图或照片"
               disabled={!isAuthenticated || isSaving}
               rows={3}
               className={`w-full px-4 py-3 rounded-lg bg-white/20 border text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 resize-none ${
                 inputError ? "border-red-400" : "border-white/30"
               } ${!isAuthenticated ? "opacity-50 cursor-not-allowed" : ""}`}
             />
+
+            {/* 图片上传和预览区域 */}
+            <div className="mt-3">
+              {!imagePreview ? (
+                <label className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-lg border-2 border-dashed transition-colors duration-200 cursor-pointer ${
+                  !isAuthenticated || isSaving
+                    ? "border-white/20 opacity-50 cursor-not-allowed"
+                    : "border-white/30 hover:border-white/50"
+                }`}>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={handleFileSelect}
+                    disabled={!isAuthenticated || isSaving}
+                    className="hidden"
+                  />
+                  <ImageIcon className="w-5 h-5 text-white/70" />
+                  <span className="text-white/70 text-sm">点击上传待办事项图片（可选）</span>
+                </label>
+              ) : (
+                <div className="relative">
+                  <img
+                    src={imagePreview}
+                    alt="预览"
+                    className="w-full h-auto rounded-lg border border-white/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={clearImage}
+                    disabled={isSaving}
+                    className="absolute top-2 right-2 p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="mt-3 space-y-3">
               {inputError && (
@@ -400,13 +505,13 @@ export function TodoList() {
 
               <button
                 type="submit"
-                disabled={!isAuthenticated || isSaving}
+                disabled={!isAuthenticated || isSaving || (!newTodo.trim() && !selectedFile)}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-white/20 hover:bg-white/30 transition-colors duration-200 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSaving ? (
+                {isSaving || isUploading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>AI 解析中...</span>
+                    <span>{isUploading ? "图片上传中..." : "AI 解析中..."}</span>
                   </>
                 ) : (
                   <>
