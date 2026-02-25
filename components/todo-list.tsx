@@ -213,34 +213,61 @@ export function TodoList() {
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
 
+    // 记录本次操作，避免 Realtime 重复处理
+    setRecentLocalChanges((prev) => new Set(prev).add(id));
+
+    // ⚡ 乐观更新：立即更新 UI，无需等待 API 响应
+    const newCompletedState = !todo.completed;
+    setTodos(
+      todos.map((t) => (t.id === id ? { ...t, completed: newCompletedState } : t))
+    );
+
     try {
       const response = await fetch(`/api/todos/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ completed: !todo.completed }),
+        body: JSON.stringify({ completed: newCompletedState }),
       });
 
       if (!response.ok) {
+        // 如果失败，回滚 UI
         const error = await response.json();
+        console.error("更新失败:", error);
         setInputError(error.error || "更新失败");
+        setTodos(
+          todos.map((t) => (t.id === id ? { ...t, completed: todo.completed } : t))
+        );
         return;
       }
 
-      setTodos(
-        todos.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-      );
-      // 记录本次操作，避免 Realtime 重复处理
-      setRecentLocalChanges((prev) => new Set(prev).add(id));
+      // ✅ 验证后端返回的数据
+      const data = await response.json();
+      if (data.todo && data.todo.completed === newCompletedState) {
+        console.log("✅ 后端更新成功:", data.todo);
+      } else {
+        console.warn("⚠️ 后端返回数据不匹配:", data);
+      }
     } catch (error) {
-      console.error("更新错误:", error);
+      // 如果失败，回滚 UI
+      console.error("❌ 更新错误:", error);
       setInputError("更新失败，请重试");
+      setTodos(
+        todos.map((t) => (t.id === id ? { ...t, completed: todo.completed } : t))
+      );
     }
   };
 
   const deleteTodo = async (id: string) => {
     if (!isAuthenticated) return;
+
+    // 记录本次操作，避免 Realtime 重复处理
+    setRecentLocalChanges((prev) => new Set(prev).add(id));
+
+    // ⚡ 乐观更新：立即从 UI 中删除
+    const previousTodos = todos;
+    setTodos(todos.filter((t) => t.id !== id));
 
     try {
       const response = await fetch(`/api/todos/${id}`, {
@@ -248,17 +275,24 @@ export function TodoList() {
       });
 
       if (!response.ok) {
+        // 如果失败，回滚 UI
         const error = await response.json();
+        console.error("删除失败:", error);
         setInputError(error.error || "删除失败");
+        setTodos(previousTodos);
         return;
       }
 
-      setTodos(todos.filter((t) => t.id !== id));
-      // 记录本次操作，避免 Realtime 重复处理
-      setRecentLocalChanges((prev) => new Set(prev).add(id));
+      // ✅ 验证后端删除成功
+      const data = await response.json();
+      if (data.success) {
+        console.log("✅ 后端删除成功, id:", id);
+      }
     } catch (error) {
-      console.error("删除错误:", error);
+      // 如果失败，回滚 UI
+      console.error("❌ 删除错误:", error);
       setInputError("删除失败，请重试");
+      setTodos(previousTodos);
     }
   };
 
