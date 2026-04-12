@@ -8,56 +8,6 @@ const aspectRatioToSize: Record<string, string> = {
   "16:9": "1280*720",  // 横屏
 };
 
-// 生成单张图片的函数
-async function generateImage(prompt: string, size: string, apiKey: string) {
-  const response = await fetch(DASHSCOPE_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "z-image-turbo",
-      input: {
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-      },
-      parameters: {
-        prompt_extend: false,
-        size,
-      },
-    }),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "图片生成失败");
-  }
-
-  // 解析返回的图片URL
-  const imageUrl = data.output?.choices?.[0]?.message?.content?.find(
-    (item: { image?: string }) => item.image
-  )?.image;
-
-  if (!imageUrl) {
-    throw new Error("未能获取生成的图片");
-  }
-
-  return {
-    imageUrl,
-    requestId: data.request_id,
-  };
-}
-
 export async function POST(request: NextRequest) {
   try {
     const { prompt, aspectRatio = "9:16" } = await request.json();
@@ -80,21 +30,63 @@ export async function POST(request: NextRequest) {
 
     const size = aspectRatioToSize[aspectRatio] || "720*1280";
 
-    // 并行生成4张图片
-    const results = await Promise.all(
-      Array(4).fill(null).map(() => generateImage(prompt, size, apiKey))
-    );
+    const response = await fetch(DASHSCOPE_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "z-image-turbo",
+        input: {
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+        },
+        parameters: {
+          prompt_extend: false,
+          size,
+        },
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("图片生成失败:", data);
+      return NextResponse.json(
+        { error: data.message || "图片生成失败" },
+        { status: response.status }
+      );
+    }
+
+    // 解析返回的图片URL
+    const imageUrl = data.output?.choices?.[0]?.message?.content?.find(
+      (item: { image?: string }) => item.image
+    )?.image;
+
+    if (!imageUrl) {
+      return NextResponse.json(
+        { error: "未能获取生成的图片" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
-      images: results.map(r => ({
-        url: r.imageUrl,
-        requestId: r.requestId,
-      })),
+      imageUrl,
+      requestId: data.request_id,
     });
   } catch (error) {
     console.error("生成图片时出错:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "服务器错误，请稍后重试" },
+      { error: "服务器错误，请稍后重试" },
       { status: 500 }
     );
   }

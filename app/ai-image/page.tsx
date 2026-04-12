@@ -35,42 +35,62 @@ export default function AIImagePage() {
     setIsGenerating(true);
     setError("");
 
-    try {
-      const response = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: prompt.trim(),
-          aspectRatio
-        }),
-      });
+    // 逐张生成，每张生成后立即展示
+    for (let i = 0; i < 4; i++) {
+      try {
+        const response = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: prompt.trim(),
+            aspectRatio,
+            single: true, // 请求单张
+          }),
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "图片生成失败");
+        if (!response.ok) {
+          // 如果是限流错误，停止生成
+          if (data.error?.includes("rate limit") || data.error?.includes("限流")) {
+            setError("触发限流，已生成的图片已保存");
+            break;
+          }
+          throw new Error(data.error || "图片生成失败");
+        }
+
+        // 每生成一张就立即显示
+        const newImage: GeneratedImage = {
+          id: data.requestId || `${Date.now()}-${Math.random()}`,
+          url: data.imageUrl,
+          prompt: prompt,
+          createdAt: new Date().toISOString(),
+          aspectRatio,
+        };
+        setImages((prev) => [newImage, ...prev]);
+
+        // 最后一次生成后扣点
+        if (i === 0) {
+          setPoints((prev) => prev - 1);
+        }
+
+        // 生成完成后清空输入框
+        if (i === 3) {
+          setPrompt("");
+        }
+
+        // 每张之间稍作延迟，避免限流
+        if (i < 3) await new Promise(resolve => setTimeout(resolve, 300));
+
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "生成失败，请重试");
+        break;
       }
-
-      setPoints((prev) => prev - 1);
-
-      // 处理返回的4张图片
-      const newImages: GeneratedImage[] = data.images.map((img: { url: string; requestId: string }) => ({
-        id: img.requestId || `${Date.now()}-${Math.random()}`,
-        url: img.url,
-        prompt: prompt,
-        createdAt: new Date().toISOString(),
-        aspectRatio,
-      }));
-
-      setImages((prev) => [...newImages, ...prev]);
-      setPrompt("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "生成失败，请重试");
-    } finally {
-      setIsGenerating(false);
     }
+
+    setIsGenerating(false);
   };
 
   const handleRecharge = () => {
@@ -192,7 +212,7 @@ export default function AIImagePage() {
         )}
 
         {/* 图片展示区域 */}
-        <div className="grid grid-cols-4 gap-4 max-w-4xl mx-auto">
+        <div className="grid grid-cols-4 gap-8 max-w-6xl mx-auto">
           {images.length > 0 ? (
             images.map((image, index) => (
               <div
