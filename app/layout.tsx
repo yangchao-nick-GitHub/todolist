@@ -1,7 +1,7 @@
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Link from "next/link";
-import { Home } from "lucide-react";
+import { Home, ImageIcon } from "lucide-react";
 import { AuthHeader } from "@/components/auth-header";
 import "./globals.css";
 
@@ -37,13 +37,22 @@ export default function RootLayout({
           <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
             <header className="sticky top-0 z-50 w-full backdrop-blur-lg bg-white/10 border-b border-white/20">
               <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-                <Link
-                  href="/"
-                  className="inline-flex items-center gap-2 text-white font-semibold hover:text-white/80 transition-colors"
-                >
-                  <Home className="w-5 h-5" />
-                  <span>首页</span>
-                </Link>
+                <div className="flex items-center gap-6">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-2 text-white font-semibold hover:text-white/80 transition-colors"
+                  >
+                    <Home className="w-5 h-5" />
+                    <span>首页</span>
+                  </Link>
+                  <Link
+                    href="/ai-image"
+                    className="inline-flex items-center gap-2 text-white font-semibold hover:text-white/80 transition-colors"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                    <span>AI生图</span>
+                  </Link>
+                </div>
                 <AuthHeader />
               </div>
             </header>

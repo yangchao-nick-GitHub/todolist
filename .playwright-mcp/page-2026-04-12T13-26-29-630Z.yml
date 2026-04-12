@@ -1,0 +1,47 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link "首页" [ref=e6] [cursor=pointer]:
+            - /url: /
+            - img [ref=e7]
+            - generic [ref=e10]: 首页
+          - link "AI生图" [ref=e11] [cursor=pointer]:
+            - /url: /ai-image
+            - img [ref=e12]
+            - generic [ref=e16]: AI生图
+        - generic [ref=e17]:
+          - link "登录" [ref=e18] [cursor=pointer]:
+            - /url: /auth/login
+            - img [ref=e19]
+            - generic [ref=e22]: 登录
+          - link "注册" [ref=e23] [cursor=pointer]:
+            - /url: /auth/sign-up
+            - img [ref=e24]
+            - generic [ref=e27]: 注册
+    - main [ref=e28]:
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - generic [ref=e104]: 登录
+          - generic [ref=e105]: 输入您的邮箱以登录账户
+        - generic [ref=e107]:
+          - generic [ref=e108]:
+            - generic [ref=e109]:
+              - generic [ref=e110]: 邮箱
+              - textbox "邮箱" [active] [ref=e111]:
+                - /placeholder: m@example.com
+            - generic [ref=e112]:
+              - generic [ref=e113]:
+                - generic [ref=e114]: 密码
+                - link "忘记密码？" [ref=e115] [cursor=pointer]:
+                  - /url: /auth/forgot-password
+              - textbox "密码" [ref=e116]
+            - button "登录" [ref=e117] [cursor=pointer]
+          - generic [ref=e118]:
+            - text: 还没有账户？
+            - link "注册" [ref=e119] [cursor=pointer]:
+              - /url: /auth/sign-up
+  - button "Open Next.js Dev Tools" [ref=e69] [cursor=pointer]:
+    - img [ref=e70]
+  - alert [ref=e73]

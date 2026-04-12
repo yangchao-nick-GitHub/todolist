@@ -1,0 +1,41 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link "首页" [ref=e6] [cursor=pointer]:
+            - /url: /
+            - img [ref=e7]
+            - generic [ref=e10]: 首页
+          - link "AI生图" [ref=e11] [cursor=pointer]:
+            - /url: /ai-image
+            - img [ref=e12]
+            - generic [ref=e16]: AI生图
+        - generic [ref=e17]:
+          - link "登录" [ref=e18] [cursor=pointer]:
+            - /url: /auth/login
+            - img [ref=e19]
+            - generic [ref=e22]: 登录
+          - link "注册" [ref=e23] [cursor=pointer]:
+            - /url: /auth/sign-up
+            - img [ref=e24]
+            - generic [ref=e27]: 注册
+    - main [ref=e28]:
+      - generic [ref=e30]:
+        - generic [ref=e32]:
+          - textbox "输入您的创意描述，让AI为您生成精美图片..." [ref=e34]
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - img [ref=e37]
+              - generic [ref=e39]: 5 点
+            - button "充值" [ref=e40] [cursor=pointer]
+        - generic [ref=e41]:
+          - generic [ref=e42] [cursor=pointer]:
+            - img [ref=e43]
+            - generic [ref=e45]: 输入提示词，生成您的第一张AI图片
+          - img [ref=e47]
+          - img [ref=e53]
+          - img [ref=e59]
+  - button "Open Next.js Dev Tools" [ref=e69] [cursor=pointer]:
+    - img [ref=e70]
+  - alert [ref=e73]
